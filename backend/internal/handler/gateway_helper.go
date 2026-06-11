@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // claudeCodeValidator is a singleton validator for Claude Code client detection
@@ -56,6 +58,25 @@ func SetClaudeCodeClientContext(c *gin.Context, body []byte, parsedReq *service.
 	}
 
 	c.Request = c.Request.WithContext(ctx)
+}
+
+// logClaudeCodeOnlyRejection 在分组仅允许 Claude Code 客户端而请求被拒时，
+// 打印校验所依赖的请求信息与正文（截断），便于排查未通过客户端校验的原因。
+// 非 ErrClaudeCodeOnly 错误时不打印，调用方无需自行判断。
+func logClaudeCodeOnlyRejection(c *gin.Context, reqLog *zap.Logger, err error, metadataUserID string, body []byte) {
+	if !errors.Is(err, service.ErrClaudeCodeOnly) {
+		return
+	}
+	const maxBodyLog = 32 * 1024
+	reqLog.Warn("gateway.claude_code_only_rejected",
+		zap.String("path", c.Request.URL.Path),
+		zap.String("user_agent", c.GetHeader("User-Agent")),
+		zap.String("x_app", c.GetHeader("X-App")),
+		zap.String("anthropic_beta", c.GetHeader("anthropic-beta")),
+		zap.String("anthropic_version", c.GetHeader("anthropic-version")),
+		zap.String("metadata_user_id", metadataUserID),
+		zap.String("request_body", truncateString(string(body[:min(len(body), maxBodyLog)]), maxBodyLog)),
+	)
 }
 
 func claudeCodeBodyMapFromParsedRequest(parsedReq *service.ParsedRequest) map[string]any {

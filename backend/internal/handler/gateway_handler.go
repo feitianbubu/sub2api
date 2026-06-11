@@ -302,10 +302,12 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					logClaudeCodeOnlyRejection(c, reqLog, err, parsedReq.MetadataUserID, body)
 					reqLog.Warn("gateway.select_account_no_available",
 						zap.String("model", reqModel),
 						zap.Int64p("group_id", apiKey.GroupID),
 						zap.String("platform", platform),
+						zap.Bool("is_claude_code_client", isClaudeCodeClient),
 						zap.Error(err),
 					)
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
@@ -579,11 +581,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					logClaudeCodeOnlyRejection(c, reqLog, err, parsedReq.MetadataUserID, body)
 					reqLog.Warn("gateway.select_account_no_available",
 						zap.String("model", reqModel),
 						zap.Int64p("group_id", currentAPIKey.GroupID),
 						zap.String("platform", platform),
 						zap.Bool("fallback_used", fallbackUsed),
+						zap.Bool("is_claude_code_client", isClaudeCodeClient),
 						zap.Error(err),
 					)
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
